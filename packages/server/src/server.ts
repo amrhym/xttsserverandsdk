@@ -13,6 +13,7 @@ import { AuthManager } from './auth/AuthManager';
 import { MinimaxClient } from './minimax/MinimaxClient';
 import { ProtocolTranslator } from './protocol/ProtocolTranslator';
 import { VoiceMapper } from './voice/VoiceMapper';
+import { ResponseSanitizer } from './response/ResponseSanitizer';
 import { ClientMessage } from './protocol/types';
 
 const COMPONENT = 'Server';
@@ -59,6 +60,9 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
 
     // Initialize protocol translator
     const translator = new ProtocolTranslator(voiceMapper);
+
+    // Initialize response sanitizer
+    const responseSanitizer = new ResponseSanitizer();
 
     // Create WebSocket server
     const wss = new WebSocketServer({
@@ -148,8 +152,11 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
               // Translate Minimax response to client protocol
               const clientResponse = translator.translateFromMinimax(message as any, connInfo.requestId);
 
-              // Send translated response to client
-              ws.send(JSON.stringify(clientResponse));
+              // Sanitize response to ensure no provider information leaks
+              const sanitizedResponse = responseSanitizer.sanitizeResponse(clientResponse);
+
+              // Send sanitized response to client
+              ws.send(JSON.stringify(sanitizedResponse));
 
               log.debug('Forwarded translated response to client', COMPONENT, {
                 clientId,
