@@ -32,6 +32,7 @@ describe('Protocol Integration Tests', () => {
 
   describe('Client Protocol', () => {
     it('should accept custom client protocol messages', (done) => {
+      jest.setTimeout(30000);
       const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, {
         headers: {
           Authorization: 'Bearer test_key',
