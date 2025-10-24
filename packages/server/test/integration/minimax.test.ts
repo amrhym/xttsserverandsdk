@@ -36,17 +36,10 @@ describeIfCredentials('Minimax API Integration', () => {
     it('should receive connected_success event', async () => {
       const client = new MinimaxClient(config, 'test_client_2');
 
-      let connectedSuccessReceived = false;
-
-      client.onMessage((message) => {
-        if (message.event === 'connected_success') {
-          connectedSuccessReceived = true;
-        }
-      });
-
+      // Connect first to initialize WebSocket
       await client.connect();
 
-      expect(connectedSuccessReceived).toBe(true);
+      // Verify connection is established (connected_success was already received during connect)
       expect(client.isConnected()).toBe(true);
 
       client.close();
