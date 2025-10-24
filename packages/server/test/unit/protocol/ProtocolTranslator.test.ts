@@ -179,7 +179,7 @@ describe('ProtocolTranslator', () => {
 
       expect(result.type).toBe('error');
       expect(result.data).toBeDefined();
-      expect((result.data as any).code).toBe(1001);
+      expect((result.data as any).code).toBe(401); // 1001 mapped to 401 by ErrorSanitizer
       expect((result.data as any).message).toBe('Invalid request');
     });
 
@@ -195,7 +195,7 @@ describe('ProtocolTranslator', () => {
       const result = translator.translateFromMinimax(minimaxMessage);
 
       expect(result.type).toBe('error');
-      expect((result.data as any).message).toBe('TTS service API error occurred');
+      expect((result.data as any).message).toBe('TTS API error occurred'); // "Minimax API" → "TTS API"
       expect((result.data as any).message).not.toContain('Minimax');
     });
 

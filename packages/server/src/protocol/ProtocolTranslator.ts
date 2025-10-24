@@ -10,6 +10,7 @@
 
 import { log } from '../utils/logger';
 import { VoiceMapper } from '../voice/VoiceMapper';
+import { ErrorSanitizer } from '../error/ErrorSanitizer';
 import {
   ClientMessage,
   ClientResponse,
@@ -23,9 +24,11 @@ const COMPONENT = 'ProtocolTranslator';
 
 export class ProtocolTranslator {
   private voiceMapper: VoiceMapper;
+  private errorSanitizer: ErrorSanitizer;
 
   constructor(voiceMapper: VoiceMapper) {
     this.voiceMapper = voiceMapper;
+    this.errorSanitizer = new ErrorSanitizer();
   }
   /**
    * Translates client message to Minimax protocol format.
@@ -113,13 +116,15 @@ export class ProtocolTranslator {
         break;
 
       case 'error':
-        // Sanitize error message (Story 1.7 will add more comprehensive sanitization)
+        // Sanitize error message using ErrorSanitizer
+        const sanitized = this.errorSanitizer.sanitizeError({
+          code: message.error.code,
+          message: message.error.message,
+        });
+
         result = {
           type: 'error',
-          data: {
-            code: message.error.code,
-            message: this.sanitizeErrorMessage(message.error.message),
-          },
+          data: sanitized,
           requestId,
         };
         break;
@@ -138,12 +143,4 @@ export class ProtocolTranslator {
   }
 
 
-  /**
-   * Basic error message sanitization.
-   * Story 1.7 will add comprehensive sanitization rules.
-   */
-  private sanitizeErrorMessage(message: string): string {
-    // Basic sanitization: remove "Minimax" references
-    return message.replace(/minimax/gi, 'TTS service');
-  }
 }

@@ -38,14 +38,9 @@ describeIfCredentials('Minimax API Integration', () => {
 
       let connectedSuccessReceived = false;
 
-      client.onMessage((data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.event === 'connected_success') {
-            connectedSuccessReceived = true;
-          }
-        } catch (error) {
-          // Ignore parse errors
+      client.onMessage((message) => {
+        if (message.event === 'connected_success') {
+          connectedSuccessReceived = true;
         }
       });
 
