@@ -29,6 +29,9 @@ export class MinimaxClient {
   private config: MinimaxConfig;
   private connected: boolean = false;
   private clientId: string;
+  private messageHandlers: Array<(message: MinimaxMessage) => void> = [];
+  private errorHandlers: Array<(error: Error) => void> = [];
+  private closeHandlers: Array<(code: number, reason: Buffer) => void> = [];
 
   constructor(config: MinimaxConfig, clientId: string) {
     this.config = config;
@@ -75,6 +78,18 @@ export class MinimaxClient {
               resolve();
             }
 
+            // Forward to all registered handlers
+            this.messageHandlers.forEach(handler => {
+              try {
+                handler(message);
+              } catch (err) {
+                log.error('Error in message handler', COMPONENT, {
+                  clientId: this.clientId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }
+            });
+
             // Log other messages
             log.debug('Message received from Minimax', COMPONENT, {
               clientId: this.clientId,
@@ -95,6 +110,18 @@ export class MinimaxClient {
             error: error.message,
           });
 
+          // Forward to all registered handlers
+          this.errorHandlers.forEach(handler => {
+            try {
+              handler(error);
+            } catch (err) {
+              log.error('Error in error handler', COMPONENT, {
+                clientId: this.clientId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          });
+
           if (!this.connected) {
             reject(error);
           }
@@ -103,6 +130,19 @@ export class MinimaxClient {
         // Handle connection close
         this.ws.on('close', (code: number, reason: Buffer) => {
           this.connected = false;
+
+          // Forward to all registered handlers
+          this.closeHandlers.forEach(handler => {
+            try {
+              handler(code, reason);
+            } catch (err) {
+              log.error('Error in close handler', COMPONENT, {
+                clientId: this.clientId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          });
+
           log.info('Minimax WebSocket connection closed', COMPONENT, {
             clientId: this.clientId,
             code,
@@ -143,6 +183,7 @@ export class MinimaxClient {
     log.debug('Message sent to Minimax', COMPONENT, {
       clientId: this.clientId,
       dataLength: typeof payload === 'string' ? payload.length : payload.length,
+      payload: typeof payload === 'string' ? payload : `<Buffer ${payload.length} bytes>`,
     });
   }
 
@@ -150,43 +191,21 @@ export class MinimaxClient {
    * Register message handler
    */
   public onMessage(handler: (message: MinimaxMessage) => void): void {
-    if (!this.ws) {
-      throw new Error('WebSocket not initialized');
-    }
-
-    this.ws.on('message', (data: Buffer) => {
-      try {
-        const message: MinimaxMessage = JSON.parse(data.toString());
-        handler(message);
-      } catch (error) {
-        log.error('Failed to parse Minimax message in handler', COMPONENT, {
-          clientId: this.clientId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    });
+    this.messageHandlers.push(handler);
   }
 
   /**
    * Register close handler
    */
   public onClose(handler: (code: number, reason: Buffer) => void): void {
-    if (!this.ws) {
-      throw new Error('WebSocket not initialized');
-    }
-
-    this.ws.on('close', handler);
+    this.closeHandlers.push(handler);
   }
 
   /**
    * Register error handler
    */
   public onError(handler: (error: Error) => void): void {
-    if (!this.ws) {
-      throw new Error('WebSocket not initialized');
-    }
-
-    this.ws.on('error', handler);
+    this.errorHandlers.push(handler);
   }
 
   /**

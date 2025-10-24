@@ -607,46 +607,37 @@ export class XTTSClient extends EventEmitter {
    * @private
    */
   private handleOpen(resolve: () => void): void {
-    // Send initial connect message with voice configuration
-    const connectMessage = {
-      action: 'connect',
-      voice: this.config.voice,
+    // Wait for 'ready' response from server before sending connect message
+    const readyHandler = (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString());
+        if (message.type === 'ready') {
+          // Server is ready, now send connect message with voice configuration
+          const connectMessage = {
+            action: 'connect',
+            voice: this.config.voice,
+          };
+
+          this.ws!.send(JSON.stringify(connectMessage));
+
+          this.connected = true;
+          this.connectionState = ConnectionStateEnum.CONNECTED;
+          this.reconnectAttempts = 0;
+
+          if (this.connectionTimeout) {
+            clearTimeout(this.connectionTimeout);
+            this.connectionTimeout = null;
+          }
+
+          this.emit('connected');
+          resolve();
+        }
+      } catch (error) {
+        // Ignore parsing errors for non-ready messages
+      }
     };
 
-    try {
-      this.ws!.send(JSON.stringify(connectMessage));
-
-      // Wait for 'ready' response from server before resolving
-      const readyHandler = (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          if (message.type === 'ready') {
-            this.connected = true;
-            this.connectionState = ConnectionStateEnum.CONNECTED;
-            this.reconnectAttempts = 0;
-
-            if (this.connectionTimeout) {
-              clearTimeout(this.connectionTimeout);
-              this.connectionTimeout = null;
-            }
-
-            this.emit('connected');
-            resolve();
-          }
-        } catch (error) {
-          // Ignore parsing errors for non-ready messages
-        }
-      };
-
-      this.ws!.once('message', readyHandler);
-
-    } catch (error) {
-      if (this.connectionTimeout) {
-        clearTimeout(this.connectionTimeout);
-        this.connectionTimeout = null;
-      }
-      throw error;
-    }
+    this.ws!.once('message', readyHandler);
   }
 
   /**

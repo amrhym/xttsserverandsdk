@@ -1,0 +1,26 @@
+{
+  "keys": [
+    {
+      "key": "xtts_k9L2mN8pQ4rT6vX1wY3zA5bC7dE9fH0jK2lM4nP6qR8sT",
+      "name": "SDK Test Client",
+      "description": "API key for testing the XTTS SDK",
+      "createdAt": "2025-10-24T12:45:00.000Z",
+      "isActive": true,
+      "rateLimit": {
+        "requestsPerMinute": 60,
+        "requestsPerDay": 10000
+      }
+    },
+    {
+      "key": "xtts_UFh-rC48yYa3ieYCePlRqwlykus1IukK_rdogfQqDTI",
+      "name": "Customer Demo",
+      "description": "API key for customer testing and evaluation",
+      "createdAt": "2025-10-24T13:00:00.000Z",
+      "isActive": true,
+      "rateLimit": {
+        "requestsPerMinute": 60,
+        "requestsPerDay": 10000
+      }
+    }
+  ]
+}

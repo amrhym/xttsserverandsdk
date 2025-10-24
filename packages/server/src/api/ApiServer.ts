@@ -134,7 +134,7 @@ export class ApiServer {
    * Health check endpoint
    */
   private async handleHealth(
-    req: http.IncomingMessage,
+    _req: http.IncomingMessage,
     res: http.ServerResponse
   ): Promise<void> {
     res.writeHead(200, { 'Content-Type': 'application/json' });

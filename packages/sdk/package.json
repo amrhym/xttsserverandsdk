@@ -1,6 +1,6 @@
 {
   "name": "xtts-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TypeScript client library for XTTS text-to-speech WebSocket proxy server with complete provider obfuscation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

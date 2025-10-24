@@ -49,7 +49,7 @@ describe('SDK Package Structure', () => {
 
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
       expect(packageJson.name).toBe('xtts-sdk');
-      expect(packageJson.version).toBe('1.0.0');
+      expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
     });
 
     it('should have tsconfig.json', () => {

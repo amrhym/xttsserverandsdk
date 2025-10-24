@@ -61,22 +61,26 @@ describe('XTTSClient - Connection Management', () => {
       expect(WebSocket).toHaveBeenCalledWith('ws://localhost:8080?apiKey=test-api-key');
     });
 
-    it('should send connect message after WebSocket opens', async () => {
+    it('should send connect message after receiving ready', async () => {
       const connectPromise = client.connect();
 
       // Simulate WebSocket open
       const openHandler = mockWebSocket.on.mock.calls.find((call: any) => call[0] === 'open')[1];
       openHandler();
 
-      expect(mockWebSocket.send).toHaveBeenCalledWith(
-        JSON.stringify({ action: 'connect', voice: 'emma' })
-      );
+      // Should not send connect yet (waits for ready)
+      expect(mockWebSocket.send).not.toHaveBeenCalled();
 
-      // Simulate ready message to complete connection
+      // Simulate ready message
       const messageHandler = mockWebSocket.once.mock.calls.find((call: any) => call[0] === 'message')[1];
       messageHandler(Buffer.from(JSON.stringify({ type: 'ready' })));
 
       await connectPromise;
+
+      // Now should send connect
+      expect(mockWebSocket.send).toHaveBeenCalledWith(
+        JSON.stringify({ action: 'connect', voice: 'emma' })
+      );
     });
 
     it('should emit connected event when ready message received', async () => {

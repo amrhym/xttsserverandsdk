@@ -32,9 +32,10 @@ export interface ClientResponse {
 export type MinimaxEvent = 'task_start' | 'task_continue' | 'task_finish';
 
 export interface VoiceSetting {
-  speed: number;   // 0.5 - 2.0
-  vol: number;     // 0.1 - 10.0
-  pitch: number;   // -12 to 12
+  voice_id: string; // Minimax voice ID
+  speed: number;    // 0.5 - 2.0
+  vol: number;      // 0.1 - 10.0
+  pitch: number;    // -12 to 12
 }
 
 export interface AudioSetting {
@@ -46,7 +47,7 @@ export interface AudioSetting {
 
 export interface MinimaxTaskStart {
   event: 'task_start';
-  voice_id: string;
+  model: string;
   voice_setting: VoiceSetting;
   audio_setting: AudioSetting;
 }
@@ -63,11 +64,12 @@ export interface MinimaxTaskFinish {
 export type MinimaxClientMessage = MinimaxTaskStart | MinimaxTaskContinue | MinimaxTaskFinish;
 
 export interface MinimaxDataResponse {
-  event: 'data';
+  event: 'data' | 'task_continued';
   data: {
     audio: string;      // Hex-encoded audio data
-    is_final: boolean;
+    is_final?: boolean; // Deprecated, use top-level is_final
   };
+  is_final?: boolean;  // Top-level is_final flag
 }
 
 export interface MinimaxErrorResponse {
@@ -78,7 +80,17 @@ export interface MinimaxErrorResponse {
   };
 }
 
-export type MinimaxServerMessage = MinimaxDataResponse | MinimaxErrorResponse;
+export interface MinimaxTaskFailedResponse {
+  event: 'task_failed';
+  base_resp: {
+    status_code: number;
+    status_msg: string;
+  };
+  session_id?: string;
+  trace_id?: string;
+}
+
+export type MinimaxServerMessage = MinimaxDataResponse | MinimaxErrorResponse | MinimaxTaskFailedResponse;
 
 /**
  * Default audio settings for Minimax connections
@@ -92,8 +104,9 @@ export const DEFAULT_AUDIO_SETTING: AudioSetting = {
 
 /**
  * Default voice settings for Minimax connections
+ * Note: voice_id will be set dynamically based on user selection
  */
-export const DEFAULT_VOICE_SETTING: VoiceSetting = {
+export const DEFAULT_VOICE_SETTING_BASE = {
   speed: 1.0,
   vol: 1.0,
   pitch: 0,

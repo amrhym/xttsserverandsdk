@@ -17,7 +17,7 @@ import {
   MinimaxClientMessage,
   MinimaxServerMessage,
   DEFAULT_AUDIO_SETTING,
-  DEFAULT_VOICE_SETTING,
+  DEFAULT_VOICE_SETTING_BASE,
 } from './types';
 
 const COMPONENT = 'ProtocolTranslator';
@@ -47,8 +47,11 @@ export class ProtocolTranslator {
         const voiceId = this.voiceMapper.getMinimaxVoiceId(message.voice);
         result = {
           event: 'task_start',
-          voice_id: voiceId,
-          voice_setting: DEFAULT_VOICE_SETTING,
+          model: 'speech-2.5-turbo-preview',
+          voice_setting: {
+            voice_id: voiceId,
+            ...DEFAULT_VOICE_SETTING_BASE,
+          },
           audio_setting: DEFAULT_AUDIO_SETTING,
         };
         break;
@@ -95,21 +98,27 @@ export class ProtocolTranslator {
 
     switch (message.event) {
       case 'data':
-        // Extract hex-encoded audio and convert to Buffer
-        const audioBuffer = Buffer.from(message.data.audio, 'hex');
+      case 'task_continued':
+        // Extract hex-encoded audio and convert to Buffer, then to base64 for client
+        const audioHex = message.data.audio;
+        const audioBuffer = audioHex ? Buffer.from(audioHex, 'hex') : Buffer.alloc(0);
+        const audioBase64 = audioBuffer.toString('base64');
 
-        if (message.data.is_final) {
-          // Final audio chunk - send complete message
+        // Check is_final at top level or in data
+        const isFinal = message.is_final ?? message.data.is_final ?? false;
+
+        if (isFinal) {
+          // Final audio chunk - send complete message with base64-encoded audio
           result = {
             type: 'complete',
-            data: { audio: audioBuffer },
+            data: { audio: audioBase64 },
             requestId,
           };
         } else {
-          // Intermediate audio chunk
+          // Intermediate audio chunk with base64-encoded audio
           result = {
             type: 'audio',
-            data: { audio: audioBuffer },
+            data: { audio: audioBase64 },
             requestId,
           };
         }
@@ -125,6 +134,24 @@ export class ProtocolTranslator {
         result = {
           type: 'error',
           data: sanitized,
+          requestId,
+        };
+        break;
+
+      case 'task_failed':
+        // Handle task_failed events from Minimax
+        const failedMessage = message as any;
+        const errorCode = failedMessage.base_resp?.status_code || 500;
+        const errorMessage = failedMessage.base_resp?.status_msg || 'Task failed';
+
+        const sanitizedFailed = this.errorSanitizer.sanitizeError({
+          code: errorCode,
+          message: errorMessage,
+        });
+
+        result = {
+          type: 'error',
+          data: sanitizedFailed,
           requestId,
         };
         break;

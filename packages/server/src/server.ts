@@ -74,10 +74,16 @@ const connectClientToMinimax = async (
       const connInfo = connectionManager.getConnection(clientId);
       if (!connInfo) return;
 
-      // Skip connected_success event (already handled in connect())
-      if (message.event === 'connected_success') {
+      // Skip informational events (already handled in connect() or don't need client notification)
+      if (message.event === 'connected_success' || message.event === 'task_started') {
         return;
       }
+
+      // Log raw message for debugging
+      log.debug('Raw Minimax message received', COMPONENT, {
+        clientId,
+        message: JSON.stringify(message),
+      });
 
       // Translate Minimax response to client protocol
       const clientResponse = translator.translateFromMinimax(message as any, connInfo.requestId);
@@ -96,6 +102,7 @@ const connectClientToMinimax = async (
       log.error('Error translating Minimax message', COMPONENT, {
         clientId,
         error: (error as Error).message,
+        rawMessage: JSON.stringify(message),
       });
     }
   });
@@ -255,7 +262,18 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
       const clientId = generateClientId();
 
       // Authenticate the connection
-      const authHeader = request.headers['authorization'];
+      // Support both Authorization header and query string apiKey parameter
+      let authHeader = request.headers['authorization'];
+
+      // If no Authorization header, check for apiKey in query string
+      if (!authHeader && request.url) {
+        const url = new URL(request.url, `http://${request.headers.host}`);
+        const apiKey = url.searchParams.get('apiKey');
+        if (apiKey) {
+          authHeader = `Bearer ${apiKey}`;
+        }
+      }
+
       const authResult = authManager.authenticate(authHeader);
 
       if (!authResult.authenticated) {
@@ -337,14 +355,22 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
       // Handle messages from client
       ws.on('message', (data: Buffer) => {
         try {
+          // Parse client message first for logging
+          const clientMessage: ClientMessage = JSON.parse(data.toString());
+
+          log.debug('Raw client message received', COMPONENT, {
+            clientId,
+            message: data.toString(),
+          });
+
           const connInfo = connMgr.getConnection(clientId);
           if (!connInfo || !connInfo.minimaxClient) {
-            log.warn('Message received for unknown or uninitialized client', COMPONENT, { clientId });
+            log.warn('Message received for unknown or uninitialized client', COMPONENT, {
+              clientId,
+              action: clientMessage.action,
+            });
             return;
           }
-
-          // Parse client message
-          const clientMessage: ClientMessage = JSON.parse(data.toString());
 
           log.debug('Message received from client', COMPONENT, {
             clientId,
