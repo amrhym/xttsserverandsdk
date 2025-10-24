@@ -10,16 +10,18 @@ import { IncomingMessage } from 'http';
 import { loadConfig, ServerConfig } from './config/environment';
 import { log } from './utils/logger';
 import { AuthManager } from './auth/AuthManager';
+import { MinimaxClient } from './minimax/MinimaxClient';
 
 const COMPONENT = 'Server';
 
 /**
- * Active WebSocket connections tracking with authentication status
+ * Active WebSocket connections tracking with authentication status and Minimax connection
  */
 interface ConnectionInfo {
   socket: WebSocket;
   authenticated: boolean;
   apiKey?: string;
+  minimaxClient?: MinimaxClient;
 }
 
 const connections = new Map<string, ConnectionInfo>();
@@ -91,11 +93,21 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
         return;
       }
 
+      // Create Minimax connection for this client
+      const minimaxClient = new MinimaxClient(
+        {
+          apiKey: serverConfig.minimax.apiKey,
+          groupId: serverConfig.minimax.groupId,
+        },
+        clientId
+      );
+
       // Store authenticated connection
       connections.set(clientId, {
         socket: ws,
         authenticated: true,
         apiKey: authResult.apiKey,
+        minimaxClient,
       });
 
       log.info('Client authenticated and connected', COMPONENT, {
@@ -103,6 +115,41 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
         apiKeyLast4: authResult.apiKey?.slice(-4),
         totalConnections: connections.size,
       });
+
+      // Connect to Minimax
+      minimaxClient
+        .connect()
+        .then(() => {
+          log.info('Minimax connection established for client', COMPONENT, {
+            clientId,
+          });
+
+          // Send ready message to client
+          ws.send(
+            JSON.stringify({
+              status: 'ready',
+              message: 'Connected to TTS service',
+            })
+          );
+        })
+        .catch((error: Error) => {
+          log.error('Failed to connect to Minimax', COMPONENT, {
+            clientId,
+            error: error.message,
+          });
+
+          // Notify client and close connection
+          ws.send(
+            JSON.stringify({
+              error: 'TTS service unavailable',
+              message: 'Failed to connect to TTS service',
+            })
+          );
+          ws.close(1011, 'TTS service connection failed');
+
+          // Clean up
+          connections.delete(clientId);
+        });
 
       // Handle messages from client
       ws.on('message', (data: Buffer) => {
@@ -118,6 +165,13 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
 
       // Handle client disconnection
       ws.on('close', (code: number, reason: Buffer) => {
+        const connInfo = connections.get(clientId);
+
+        // Close Minimax connection if it exists
+        if (connInfo?.minimaxClient) {
+          connInfo.minimaxClient.close();
+        }
+
         connections.delete(clientId);
         log.info('Client disconnected', COMPONENT, {
           clientId,
