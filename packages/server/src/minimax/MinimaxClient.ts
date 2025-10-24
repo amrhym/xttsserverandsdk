@@ -129,27 +129,42 @@ export class MinimaxClient {
   /**
    * Send message to Minimax
    */
-  public send(data: string | Buffer): void {
+  public send(data: string | Buffer | object): void {
     if (!this.ws || !this.connected) {
       throw new Error('Not connected to Minimax');
     }
 
-    this.ws.send(data);
+    // If data is an object, stringify it
+    const payload = typeof data === 'object' && !(data instanceof Buffer)
+      ? JSON.stringify(data)
+      : data;
+
+    this.ws.send(payload);
     log.debug('Message sent to Minimax', COMPONENT, {
       clientId: this.clientId,
-      dataLength: typeof data === 'string' ? data.length : data.length,
+      dataLength: typeof payload === 'string' ? payload.length : payload.length,
     });
   }
 
   /**
    * Register message handler
    */
-  public onMessage(handler: (data: Buffer) => void): void {
+  public onMessage(handler: (message: MinimaxMessage) => void): void {
     if (!this.ws) {
       throw new Error('WebSocket not initialized');
     }
 
-    this.ws.on('message', handler);
+    this.ws.on('message', (data: Buffer) => {
+      try {
+        const message: MinimaxMessage = JSON.parse(data.toString());
+        handler(message);
+      } catch (error) {
+        log.error('Failed to parse Minimax message in handler', COMPONENT, {
+          clientId: this.clientId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
   }
 
   /**

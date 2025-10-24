@@ -7,23 +7,15 @@
 import { startServer, shutdown } from '../../src/server';
 import { ServerConfig } from '../../src/config/environment';
 import { WebSocketServer } from 'ws';
+import { createTestConfig } from '../helpers/testConfig';
 
 describe('WebSocket Server', () => {
   let server: WebSocketServer;
 
   // Test configuration
-  const testConfig: ServerConfig = {
-    port: 0, // Use random available port
-    host: '127.0.0.1',
-    logLevel: 'error', // Reduce log noise during tests
-    nodeEnv: 'test',
+  const testConfig: ServerConfig = createTestConfig({
     maxConnections: 100,
-    authorizedApiKeys: ['test_key'],
-    minimax: {
-      apiKey: 'test_minimax_key',
-      groupId: 'test_group_id',
-    },
-  };
+  });
 
   afterEach(async () => {
     // Clean up server after each test

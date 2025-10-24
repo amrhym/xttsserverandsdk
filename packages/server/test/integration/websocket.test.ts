@@ -6,13 +6,14 @@
 
 import { startServer, shutdown } from '../../src/server';
 import { ServerConfig } from '../../src/config/environment';
+import { createTestConfig } from '../helpers/testConfig';
 import { WebSocketServer, WebSocket } from 'ws';
 
 describe('WebSocket Integration', () => {
   let server: WebSocketServer;
   let serverPort: number;
 
-  const testConfig: ServerConfig = {
+  const testConfig = createTestConfig({
     port: 0, // Random port
     host: '127.0.0.1',
     logLevel: 'error',

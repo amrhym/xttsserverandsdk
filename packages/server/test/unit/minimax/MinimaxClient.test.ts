@@ -165,7 +165,8 @@ describe('MinimaxClient', () => {
       const handler = jest.fn();
       client.onMessage(handler);
 
-      expect(mockWs.on).toHaveBeenCalledWith('message', handler);
+      // Should register a message handler (wrapped, so check call count)
+      expect(mockWs.on).toHaveBeenCalledWith('message', expect.any(Function));
     });
 
     it('should register close handler', () => {

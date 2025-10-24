@@ -11,6 +11,9 @@ import { loadConfig, ServerConfig } from './config/environment';
 import { log } from './utils/logger';
 import { AuthManager } from './auth/AuthManager';
 import { MinimaxClient } from './minimax/MinimaxClient';
+import { ProtocolTranslator } from './protocol/ProtocolTranslator';
+import { VoiceMapper } from './voice/VoiceMapper';
+import { ClientMessage } from './protocol/types';
 
 const COMPONENT = 'Server';
 
@@ -22,6 +25,7 @@ interface ConnectionInfo {
   authenticated: boolean;
   apiKey?: string;
   minimaxClient?: MinimaxClient;
+  requestId?: string;
 }
 
 const connections = new Map<string, ConnectionInfo>();
@@ -49,6 +53,12 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
   return new Promise((resolve, reject) => {
     // Initialize authentication manager
     const authManager = new AuthManager(serverConfig.authorizedApiKeys);
+
+    // Initialize voice mapper
+    const voiceMapper = new VoiceMapper(serverConfig.voiceMapping);
+
+    // Initialize protocol translator
+    const translator = new ProtocolTranslator(voiceMapper);
 
     // Create WebSocket server
     const wss = new WebSocketServer({
@@ -116,7 +126,7 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
         totalConnections: connections.size,
       });
 
-      // Connect to Minimax
+      // Connect to Minimax first, then set up handlers
       minimaxClient
         .connect()
         .then(() => {
@@ -124,11 +134,70 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
             clientId,
           });
 
+          // Set up Minimax message handlers AFTER connection succeeds
+          minimaxClient.onMessage((message) => {
+            try {
+              const connInfo = connections.get(clientId);
+              if (!connInfo) return;
+
+              // Skip connected_success event (already handled in connect())
+              if (message.event === 'connected_success') {
+                return;
+              }
+
+              // Translate Minimax response to client protocol
+              const clientResponse = translator.translateFromMinimax(message as any, connInfo.requestId);
+
+              // Send translated response to client
+              ws.send(JSON.stringify(clientResponse));
+
+              log.debug('Forwarded translated response to client', COMPONENT, {
+                clientId,
+                responseType: clientResponse.type,
+              });
+            } catch (error) {
+              log.error('Error translating Minimax message', COMPONENT, {
+                clientId,
+                error: (error as Error).message,
+              });
+            }
+          });
+
+          minimaxClient.onError((error) => {
+            log.error('Minimax connection error', COMPONENT, {
+              clientId,
+              error: error.message,
+            });
+
+            // Send generic error to client (obfuscating Minimax)
+            ws.send(
+              JSON.stringify({
+                type: 'error',
+                data: {
+                  code: 500,
+                  message: 'TTS service error',
+                },
+              })
+            );
+          });
+
+          minimaxClient.onClose(() => {
+            log.info('Minimax connection closed', COMPONENT, { clientId });
+
+            // Close client connection
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.close(1011, 'TTS service connection closed');
+            }
+
+            // Clean up
+            connections.delete(clientId);
+          });
+
           // Send ready message to client
           ws.send(
             JSON.stringify({
-              status: 'ready',
-              message: 'Connected to TTS service',
+              type: 'ready',
+              data: { message: 'Connected to TTS service' },
             })
           );
         })
@@ -141,8 +210,11 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
           // Notify client and close connection
           ws.send(
             JSON.stringify({
-              error: 'TTS service unavailable',
-              message: 'Failed to connect to TTS service',
+              type: 'error',
+              data: {
+                code: 503,
+                message: 'TTS service unavailable',
+              },
             })
           );
           ws.close(1011, 'TTS service connection failed');
@@ -153,14 +225,54 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
 
       // Handle messages from client
       ws.on('message', (data: Buffer) => {
-        log.debug('Message received from client', COMPONENT, {
-          clientId,
-          dataLength: data.length,
-        });
+        try {
+          const connInfo = connections.get(clientId);
+          if (!connInfo || !connInfo.minimaxClient) {
+            log.warn('Message received for unknown or uninitialized client', COMPONENT, { clientId });
+            return;
+          }
 
-        // Message handling will be implemented in later stories
-        // For now, just acknowledge receipt
-        ws.send(JSON.stringify({ status: 'received' }));
+          // Parse client message
+          const clientMessage: ClientMessage = JSON.parse(data.toString());
+
+          log.debug('Message received from client', COMPONENT, {
+            clientId,
+            action: clientMessage.action,
+            hasText: Boolean(clientMessage.text),
+          });
+
+          // Store requestId for correlation
+          if (clientMessage.requestId) {
+            connInfo.requestId = clientMessage.requestId;
+          }
+
+          // Translate client message to Minimax protocol
+          const minimaxMessage = translator.translateToMinimax(clientMessage);
+
+          // Forward translated message to Minimax
+          connInfo.minimaxClient.send(minimaxMessage);
+
+          log.debug('Forwarded translated message to Minimax', COMPONENT, {
+            clientId,
+            event: minimaxMessage.event,
+          });
+        } catch (error) {
+          log.error('Error handling client message', COMPONENT, {
+            clientId,
+            error: (error as Error).message,
+          });
+
+          // Send error response to client
+          ws.send(
+            JSON.stringify({
+              type: 'error',
+              data: {
+                code: 400,
+                message: 'Invalid message format',
+              },
+            })
+          );
+        }
       });
 
       // Handle client disconnection
