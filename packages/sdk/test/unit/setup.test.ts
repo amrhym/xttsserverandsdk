@@ -48,7 +48,7 @@ describe('SDK Package Structure', () => {
       expect(fs.existsSync(packagePath)).toBe(true);
 
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
-      expect(packageJson.name).toBe('@yourorg/xtts-sdk');
+      expect(packageJson.name).toBe('xtts-sdk');
       expect(packageJson.version).toBe('1.0.0');
     });
 

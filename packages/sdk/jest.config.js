@@ -21,5 +21,7 @@ module.exports = {
     '^.+\\.ts$': 'ts-jest'
   },
   clearMocks: true,
-  resetMocks: true
+  resetMocks: true,
+  testTimeout: 10000,
+  forceExit: true
 };

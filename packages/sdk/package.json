@@ -1,32 +1,57 @@
 {
-  "name": "@yourorg/xtts-sdk",
+  "name": "xtts-sdk",
   "version": "1.0.0",
-  "description": "Client SDK for XTTS text-to-speech service",
+  "description": "TypeScript client library for XTTS text-to-speech WebSocket proxy server with complete provider obfuscation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "module": "dist/index.js",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "API.md",
+    "LICENSE",
+    "examples"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/xtts-minimax-proxy.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/xtts-minimax-proxy/issues"
+  },
+  "homepage": "https://github.com/yourusername/xtts-minimax-proxy#readme",
   "scripts": {
     "build": "tsc",
+    "build:clean": "rm -rf dist && npm run build",
     "dev": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "prepublishOnly": "npm run build && npm test"
+    "clean": "rm -rf dist coverage",
+    "prepublishOnly": "npm run clean && npm run build && npm test",
+    "prepare": "npm run build",
+    "prepack": "npm run build"
   },
   "keywords": [
     "tts",
     "text-to-speech",
     "audio",
     "speech-synthesis",
-    "websocket"
+    "websocket",
+    "xtts",
+    "streaming",
+    "real-time",
+    "typescript"
   ],
-  "author": "",
+  "author": "Your Name <your.email@example.com>",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "ws": "^8.16.0"
   },
