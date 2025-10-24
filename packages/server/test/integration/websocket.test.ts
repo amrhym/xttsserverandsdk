@@ -39,7 +39,11 @@ describe('WebSocket Integration', () => {
 
   describe('Client Connection', () => {
     it('should accept client WebSocket connection', (done) => {
-      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, {
+        headers: {
+          Authorization: 'Bearer test_key',
+        },
+      });
 
       client.on('open', () => {
         expect(client.readyState).toBe(WebSocket.OPEN);
@@ -58,7 +62,11 @@ describe('WebSocket Integration', () => {
       let openedCount = 0;
 
       for (let i = 0; i < connectionCount; i++) {
-        const client = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+        const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, {
+          headers: {
+            Authorization: 'Bearer test_key',
+          },
+        });
         clients.push(client);
 
         client.on('open', () => {
@@ -80,7 +88,11 @@ describe('WebSocket Integration', () => {
     });
 
     it('should handle client disconnection gracefully', (done) => {
-      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, {
+        headers: {
+          Authorization: 'Bearer test_key',
+        },
+      });
 
       client.on('open', () => {
         client.close();
@@ -98,7 +110,7 @@ describe('WebSocket Integration', () => {
 
   describe('Message Handling', () => {
     it('should receive messages from client', (done) => {
-      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, { headers: { Authorization: "Bearer test_key" } });
 
       client.on('open', () => {
         client.send('Test message');
@@ -117,7 +129,7 @@ describe('WebSocket Integration', () => {
     });
 
     it('should handle JSON messages', (done) => {
-      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, { headers: { Authorization: "Bearer test_key" } });
 
       client.on('open', () => {
         const message = { action: 'test', data: 'hello' };
@@ -139,7 +151,7 @@ describe('WebSocket Integration', () => {
 
   describe('Error Handling', () => {
     it('should handle client errors without crashing server', (done) => {
-      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+      const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, { headers: { Authorization: "Bearer test_key" } });
 
       client.on('open', () => {
         // Force close the connection from client side abruptly
@@ -148,7 +160,7 @@ describe('WebSocket Integration', () => {
         // Give server time to handle the error
         setTimeout(() => {
           // Server should still be running
-          const testClient = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+          const testClient = new WebSocket(`ws://127.0.0.1:${serverPort}`, { headers: { Authorization: "Bearer test_key" } });
 
           testClient.on('open', () => {
             testClient.close();
@@ -173,7 +185,7 @@ describe('WebSocket Integration', () => {
 
       // Connect 3 clients
       for (let i = 0; i < 3; i++) {
-        const client = new WebSocket(`ws://127.0.0.1:${serverPort}`);
+        const client = new WebSocket(`ws://127.0.0.1:${serverPort}`, { headers: { Authorization: "Bearer test_key" } });
         clients.push(client);
       }
 

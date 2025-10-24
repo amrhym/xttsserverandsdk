@@ -6,15 +6,23 @@
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
+import { IncomingMessage } from 'http';
 import { loadConfig, ServerConfig } from './config/environment';
 import { log } from './utils/logger';
+import { AuthManager } from './auth/AuthManager';
 
 const COMPONENT = 'Server';
 
 /**
- * Active WebSocket connections tracking
+ * Active WebSocket connections tracking with authentication status
  */
-const connections = new Map<string, WebSocket>();
+interface ConnectionInfo {
+  socket: WebSocket;
+  authenticated: boolean;
+  apiKey?: string;
+}
+
+const connections = new Map<string, ConnectionInfo>();
 
 /**
  * Generate unique client ID
@@ -37,6 +45,9 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
   });
 
   return new Promise((resolve, reject) => {
+    // Initialize authentication manager
+    const authManager = new AuthManager(serverConfig.authorizedApiKeys);
+
     // Create WebSocket server
     const wss = new WebSocketServer({
       port: serverConfig.port,
@@ -53,12 +64,43 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
     });
 
     // Handle new client connections
-    wss.on('connection', (ws: WebSocket) => {
+    wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
       const clientId = generateClientId();
-      connections.set(clientId, ws);
 
-      log.info('Client connected', COMPONENT, {
+      // Authenticate the connection
+      const authHeader = request.headers['authorization'];
+      const authResult = authManager.authenticate(authHeader);
+
+      if (!authResult.authenticated) {
+        log.warn('Connection rejected: authentication failed', COMPONENT, {
+          clientId,
+          error: authResult.error,
+        });
+
+        // Send error message before closing
+        ws.send(
+          JSON.stringify({
+            error: 'Authentication failed',
+            code: 401,
+            message: authResult.error,
+          })
+        );
+
+        // Close connection with policy violation code
+        ws.close(1008, authResult.error);
+        return;
+      }
+
+      // Store authenticated connection
+      connections.set(clientId, {
+        socket: ws,
+        authenticated: true,
+        apiKey: authResult.apiKey,
+      });
+
+      log.info('Client authenticated and connected', COMPONENT, {
         clientId,
+        apiKeyLast4: authResult.apiKey?.slice(-4),
         totalConnections: connections.size,
       });
 
@@ -115,9 +157,9 @@ export const shutdown = (wss: WebSocketServer): Promise<void> => {
     });
 
     // Close all active connections
-    connections.forEach((ws, clientId) => {
+    connections.forEach((connInfo, clientId) => {
       log.debug('Closing client connection', COMPONENT, { clientId });
-      ws.close(1001, 'Server shutting down');
+      connInfo.socket.close(1001, 'Server shutting down');
     });
     connections.clear();
 
