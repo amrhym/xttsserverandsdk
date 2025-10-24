@@ -300,10 +300,24 @@ export const startServer = async (config?: ServerConfig): Promise<WebSocketServe
           translator,
           responseSanitizer
         ).catch((error) => {
-          log.error('Failed to connect client', COMPONENT, {
+          log.error('Failed to connect client to Minimax', COMPONENT, {
             clientId,
             error: (error as Error).message,
           });
+
+          // Ensure client is notified even if connectClientToMinimax failed to send error
+          if (ws.readyState === 1) { // OPEN
+            ws.send(
+              JSON.stringify({
+                type: 'error',
+                data: {
+                  code: 503,
+                  message: 'TTS service unavailable',
+                },
+              })
+            );
+            ws.close(1011, 'Failed to connect to TTS service');
+          }
         });
       } else {
         // Add to queue (silent queuing - no status update)
